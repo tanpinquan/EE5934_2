@@ -244,3 +244,4 @@ test_im = Image.open('data/Cityscapes/train_img/aachen_000008_000019_leftImg8bit
 resized_im, seg_map = MODEL.run(test_im)
 
 vis_segmentation(resized_im, seg_map)
+
