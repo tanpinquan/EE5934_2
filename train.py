@@ -42,7 +42,7 @@ def adjust_learning_rate(optimizer, lr, i_iter, n_iter):
 
 
 # Define network
-lr = 0.001
+lr = 0.01
 momentum = 0.9
 weight_decay = 5e-4
 nesterov = False
@@ -70,21 +70,20 @@ for iter_i in range(max_iter):
     for i, batch in enumerate(gta_dataloader):
         images = batch['image'].to(device)
         labels = batch['label'].to(device)
-
-        # labels_test = labels.data.clone().cpu()
-        # labels_test[labels_test == 255] = 0
-        # labels = torch.zeros([2, 224, 224]).to(device)
-        # print(torch.max(labels_test))
+        optimizer.zero_grad()
 
         pred = model(images)
         loss_seg = criterion(pred, labels.long())
+        # loss_seg = loss_seg / len(gta_datset.filenames)
+
         loss_seg = loss_seg / batch_size
         loss_seg.backward()
+        optimizer.step()
+
         print(i, loss_seg)
         # if i > 50:
         #     break
-
-    optimizer.step()
+    # optimizer.step()
 
     pred_label = pred[0].argmax(0)
 
