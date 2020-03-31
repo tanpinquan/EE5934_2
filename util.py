@@ -43,7 +43,8 @@ LABEL2TRAIN = np.array([
     [31, 16],
     [32, 17],
     [33, 18],
-    [-1, 255]])
+    [-1, 255],
+    [34, 255]])
 
 PALETTE = [
     [128, 64, 128],
@@ -68,7 +69,7 @@ PALETTE = [
     [0, 0, 0]]
 
 
-def preprocess(img, size=(640, 1280), should_resize=False):
+def preprocess(img, size=(512, 1024), should_resize=True):
     if should_resize:
         transform = T.Compose([
             T.Resize(size),
@@ -87,9 +88,9 @@ def preprocess(img, size=(640, 1280), should_resize=False):
     return transform(img)
 
 
-def deprocess(img, should_rescale=True):
+def deprocess(img, should_rescale=False):
     transform = T.Compose([
-        T.Lambda(lambda x: x[0]),
+        T.Lambda(lambda x: x),
         T.Normalize(mean=[0, 0, 0], std=(1.0 / IMAGENET_STD).tolist()),
         T.Normalize(mean=(-IMAGENET_MEAN).tolist(), std=[1, 1, 1]),
         T.Lambda(rescale) if should_rescale else T.Lambda(lambda x: x),
@@ -106,7 +107,7 @@ def rescale(x):
 
 def label2train(label_img):
     for val in LABEL2TRAIN:
-        print(val)
+        # print(val)
         label_img[label_img == val[0]] = val[1]
     return label_img
 
@@ -118,24 +119,29 @@ def label2color(label_ids):
             output_img[label_ids == label] = PALETTE[label]
     return output_img
 
+# def color2train(color_img):
+
+
 if __name__ == "__main__":
     ''' Just some code to test the functions'''
 
     ''' Test preprocess and deprocess'''
     image_orig = PIL.Image.open('data/CItyscapes/train_img/aachen_000008_000019_leftImg8bit.png')
-    image_array = np.array(image_orig)
     image_t = preprocess(image_orig)
-    image_deproc = deprocess(image_t, should_rescale=False)
+    image_deproc = deprocess(image_t[0], should_rescale=False)
     image_deproc_array = np.array(image_deproc)
+
     plt.imshow(image_orig)
-    plt.show()
-    plt.imshow(image_array)
+    plt.title('original image')
     plt.show()
 
     plt.imshow(image_deproc)
+    plt.title('transformed back image')
     plt.show()
-    plt.imshow(image_deproc_array)
-    plt.show()
+
+
+
+
 
     with open('scene_parsing/cityscapes_info.json') as f:
         cityscapes_info = json.load(f)
@@ -150,13 +156,17 @@ if __name__ == "__main__":
     label_color = PIL.Image.open('data/CItyscapes/val_label/aachen_000008_000019_gtFine_color.png')
     label_color_array = np.array(label_color)
     plt.imshow(label_color_array)
+    plt.title('original labels')
+
     plt.show()
     output_img = label2color(train_labels)
     plt.imshow(output_img)
+    plt.title('transformed back labels')
     plt.show()
-    # output_img = np.zeros((train_labels.shape[0], train_labels.shape[1], 3)).astype('uint8')
-    #
-    #
-    # for label in LABEL2TRAIN[:, 1]:
-    #     if label != 255:
-    #         output_img[train_labels == label] = PALETTE[label]
+
+
+    '''Test GTAV'''
+    image_gta = np.array(PIL.Image.open('data/GTA_V/train_label/00003.png'))
+    plt.imshow(label2color(label2train(image_gta)))
+    plt.title('transformed back labels for gta')
+    plt.show()

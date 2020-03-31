@@ -52,8 +52,9 @@ deeplab_model = DeepLabHead(in_channels=320,num_classes=18)
 model = SegmentationModel(backbone=mobilenet_model, classifier=deeplab_model)
 print(model)
 
-model.eval()
-output = model(image_test)
+# model.eval()
+input_batch = image_test.unsqueeze(0) # create a mini-batch as expected by the model
+output = model(input_batch)
 print(output.shape)
 output_predictions = output[0,:,:,:].argmax(0)
 
