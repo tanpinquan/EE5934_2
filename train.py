@@ -128,7 +128,6 @@ for iter_i in range(max_iter):
         loss = loss_seg + loss_adv
         loss.backward()
 
-        a=b
         optimizer.step()
 
         print(i, loss_seg)
