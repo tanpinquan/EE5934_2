@@ -37,5 +37,31 @@ class GtaDataset(Dataset):
         return sample
 
 
+class CityscapesDataset(Dataset):
+
+    def __init__(self, image_dir, image_size):
+        self.filenames = os.listdir(image_dir)
+        self.image_dir = image_dir
+        self.image_size = image_size
+
+    def __len__(self):
+        return len(self.filenames)
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        img_path = os.path.join(self.image_dir, self.filenames[idx])
+        image = Image.open(img_path)
+        image = preprocess(image, size=self.image_size, should_resize=True)
+        image = torch.squeeze(image)
+
+        sample = {'image': image}
+
+        return sample
+
+
+
+
 
 
