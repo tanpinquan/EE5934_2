@@ -85,7 +85,7 @@ source_label = 0
 target_label = 1
 
 '''Define discriminator network'''
-lr_D = 2.5e-4
+lr_D = 2.4e-4
 model_D = FCDiscriminator(num_classes=num_classes)
 model_D.to(device)
 model_D.train()
@@ -94,6 +94,8 @@ optimizer_D = torch.optim.Adam(model_D.parameters(), lr=lr_D, betas=(0.9, 0.99))
 criterion_adv = nn.BCEWithLogitsLoss(weight=None, reduction='mean')
 
 ''' Perform training'''
+G_losses = []
+D_losses = []
 max_iter = 25
 for iter_i in range(max_iter):
     optimizer.zero_grad()
@@ -122,7 +124,7 @@ for iter_i in range(max_iter):
         # Compute Lseg
         pred_source = model(source_images)
         loss_seg = criterion(pred_source, source_labels.long())
-
+        loss_seg.backward()
         # loss_seg = loss_seg / len(gta_datset.filenames)
 
         # Compute Ladv
@@ -132,12 +134,10 @@ for iter_i in range(max_iter):
         loss_adv = criterion_adv(D_out_target,
                                  torch.FloatTensor(D_out_target.data.size()).fill_(source_label).to(device))
 
-        # Backpropagate
-        loss = loss_seg + loss_adv
-        # loss = loss_seg
-        loss.backward()
-
+        loss_adv.backward()
         optimizer.step()
+        loss = loss_seg + loss_adv
+
 
         '''Train discriminator net'''
         # accumulate grads in D
@@ -159,9 +159,11 @@ for iter_i in range(max_iter):
                                       torch.FloatTensor(D_out_target.data.size()).fill_(target_label).to(device))
         loss_D_target.backward()
         loss_D = loss_D_source + loss_D_target
-
         optimizer_D.step()
-        print(i, loss_seg, loss_D)
+
+        G_losses.append(loss)
+        D_losses.append(loss_D)
+        print(i, 'Lseg:', loss_seg.item(), 'Ladv:', loss_adv.item(), 'loss_d_source:', loss_D_source.item(), 'loss_d_target:', loss_D_target.item())
 
         # if i > 5:
         #     break
@@ -169,6 +171,7 @@ for iter_i in range(max_iter):
 
     # ax enables access to manipulate each of subplots
     fig = plt.figure()
+    fig.suptitle('Epoch '+ iter_i)
 
     ax = []
 
