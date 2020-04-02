@@ -63,7 +63,7 @@ def adjust_learning_rate(optimizer, lr, i_iter, n_iter):
 
 
 ''' Define segmentation network (deeplab + mobilenet)'''
-lr = 0.01
+lr = 0.0025
 momentum = 0.9
 weight_decay = 5e-4
 nesterov = False
@@ -91,10 +91,10 @@ model_D.to(device)
 model_D.train()
 
 optimizer_D = torch.optim.Adam(model_D.parameters(), lr=lr_D, betas=(0.9, 0.99))
-criterion_adv = nn.BCEWithLogitsLoss()
+criterion_adv = nn.BCEWithLogitsLoss(weight=None, reduction='mean')
 
 ''' Perform training'''
-max_iter = 10
+max_iter = 25
 for iter_i in range(max_iter):
     optimizer.zero_grad()
     print('epoch', iter_i)
@@ -112,58 +112,123 @@ for iter_i in range(max_iter):
         _, target_batch = cityscapes_dataloader_iter.__next__()
         target_images = target_batch['image'].to(device)
 
+        '''Train segmentation net'''
+        # don't accumulate grads in D
+        for param in model_D.parameters():
+            param.requires_grad = False
+
         optimizer.zero_grad()
 
-        pred = model(source_images)
-        loss_seg = criterion(pred, source_labels.long())
-        # loss_seg = loss_seg / len(gta_datset.filenames)
-        loss_seg = loss_seg / batch_size
+        # Compute Lseg
+        pred_source = model(source_images)
+        loss_seg = criterion(pred_source, source_labels.long())
 
+        # loss_seg = loss_seg / len(gta_datset.filenames)
+
+        # Compute Ladv
         pred_target = model(target_images)
 
-        D_out = model_D(F.softmax(pred_target, dim=0))
-        adv_target = torch.FloatTensor(pred_target.data.size()).fill_(source_label).to(device)
-        loss_adv = criterion_adv(pred_target, adv_target) / batch_size
+        D_out_target = model_D(F.softmax(pred_target, dim=0))
+        loss_adv = criterion_adv(D_out_target,
+                                 torch.FloatTensor(D_out_target.data.size()).fill_(source_label).to(device))
 
+        # Backpropagate
         loss = loss_seg + loss_adv
+        # loss = loss_seg
         loss.backward()
 
         optimizer.step()
 
-        print(i, loss_seg)
-        if i > 50:
-            break
-    # optimizer.step()
+        '''Train discriminator net'''
+        # accumulate grads in D
+        for param in model_D.parameters():
+            param.requires_grad = True
 
-    pred_label = pred[0].argmax(0)
+        optimizer_D.zero_grad()
 
+        pred_source = pred_source.detach()
+        D_out_source = model_D(F.softmax(pred_source, dim=0))
+
+        loss_D_source = criterion_adv(D_out_source,
+                                      torch.FloatTensor(D_out_source.data.size()).fill_(source_label).to(device))
+        loss_D_source.backward()
+        pred_target = pred_target.detach()
+        D_out_target = model_D(F.softmax(pred_target, dim=0))
+
+        loss_D_target = criterion_adv(D_out_target,
+                                      torch.FloatTensor(D_out_target.data.size()).fill_(target_label).to(device))
+        loss_D_target.backward()
+        loss_D = loss_D_source + loss_D_target
+
+        optimizer_D.step()
+        print(i, loss_seg, loss_D)
+
+        # if i > 5:
+        #     break
+            # print(i, loss_seg, loss_D)
+
+    # ax enables access to manipulate each of subplots
+    fig = plt.figure()
+
+    ax = []
+
+    pred_label = pred_source[0].argmax(0)
+    ax.append(fig.add_subplot(2, 2, 1))
+    ax[-1].set_title('GTA image')  # set title
     plt.imshow(deprocess(source_images[0].cpu()))
-    plt.title('epoch ' + str(iter_i) + ': gta image')
-    plt.show()
 
+    ax.append(fig.add_subplot(2, 2, 2))
+    ax[-1].set_title('GTA label')  # set title
     plt.imshow(label2color(pred_label.cpu()))
-    plt.title('epoch ' + str(iter_i) + ': gta label')
-    plt.show()
 
-    pred_target = model(target_images)
     pred_target_label = pred_target[0].argmax(0)
-
+    ax.append(fig.add_subplot(2, 2, 3))
+    ax[-1].set_title('Cityscape image')  # set title
     plt.imshow(deprocess(target_images[0].cpu()))
-    plt.title('epoch ' + str(iter_i) + ': cityscape image')
-    plt.show()
+
+    ax.append(fig.add_subplot(2, 2, 4))
+    ax[-1].set_title('Cityscape label')  # set title
     plt.imshow(label2color(pred_target_label.cpu()))
-    plt.title('epoch ' + str(iter_i) + ': cityscape label')
+
     plt.show()
 
-pred_label = pred[0].argmax(0)
 
-plt.imshow(deprocess(source_images[0].cpu()))
-plt.title('image')
-plt.show()
 
+
+model.eval()
+data = gta_datset[0]
+source_image = torch.unsqueeze(data['image'],dim=0).to(device)
+source_label = data['label']
+pred_label = model(source_image)[0].argmax(0)
+
+data = cityscapes_dataset[8]
+target_image = torch.unsqueeze(data['image'],dim=0).to(device)
+pred_target_label = model(target_image)[0].argmax(0)
+fig = plt.figure()
+
+ax = []
+
+ax.append(fig.add_subplot(2, 3, 1))
+ax[-1].set_title('GTA image')  # set title
+plt.imshow(deprocess(source_image[0].cpu()))
+
+ax.append(fig.add_subplot(2, 3, 2))
+ax[-1].set_title('GTA output')  # set title
 plt.imshow(label2color(pred_label.cpu()))
-plt.title('label')
+
+ax.append(fig.add_subplot(2, 3, 3))
+ax[-1].set_title('GTA label')  # set title
+plt.imshow(label2color(source_label))
+
+ax.append(fig.add_subplot(2, 3, 4))
+ax[-1].set_title('Cityscapes image')  # set title
+plt.imshow(deprocess(target_image[0].cpu()))
+
+ax.append(fig.add_subplot(2, 3, 5))
+ax[-1].set_title('Cityscapes output')  # set title
+plt.imshow(label2color(pred_target_label.cpu()))
 plt.show()
+
 
 # _, batch = gta_dataloader_iter.__next__()
 # images = batch['image'].to(device)
