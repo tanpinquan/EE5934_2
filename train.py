@@ -86,7 +86,7 @@ target_label = 1
 
 '''Define discriminator network'''
 lr_D = 2.4e-4
-lambda_adv = 0.001
+lambda_adv = 0.01
 model_D = FCDiscriminator(num_classes=num_classes)
 model_D.to(device)
 model_D.train()
