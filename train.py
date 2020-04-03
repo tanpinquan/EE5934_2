@@ -1,5 +1,5 @@
 from deeplab.deeplab import *
-from discriminator import FCDiscriminator
+from discriminator import FCDiscriminator, Discriminator
 import dataloader
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
@@ -16,7 +16,7 @@ print('Use', device)
 
 '''Create datasets'''
 batch_size = 4
-shuffle = False
+shuffle = True
 image_size = (224, 224)
 
 gta_datset = dataloader.GtaDataset('./data/GTA_V/train_img', './data/GTA_V/train_label', image_size=image_size)
@@ -86,6 +86,7 @@ target_label = 1
 
 '''Define discriminator network'''
 lr_D = 2.4e-4
+lambda_adv = 0.001
 model_D = FCDiscriminator(num_classes=num_classes)
 model_D.to(device)
 model_D.train()
@@ -94,11 +95,14 @@ optimizer_D = torch.optim.Adam(model_D.parameters(), lr=lr_D, betas=(0.9, 0.99))
 criterion_adv = nn.BCEWithLogitsLoss(weight=None, reduction='mean')
 
 ''' Perform training'''
+seg_losses = []
+adv_losses = []
 G_losses = []
 D_losses = []
 max_iter = 25
 for iter_i in range(max_iter):
     optimizer.zero_grad()
+    optimizer_D.zero_grad()
     print('epoch', iter_i)
     adjust_learning_rate(optimizer, lr, iter_i, max_iter)
     adjust_learning_rate(optimizer_D, lr_D, iter_i, max_iter)
@@ -130,10 +134,10 @@ for iter_i in range(max_iter):
         # Compute Ladv
         pred_target = model(target_images)
 
-        D_out_target = model_D(F.softmax(pred_target, dim=0))
+        D_out_target = model_D(F.softmax(pred_target, dim=1))
         loss_adv = criterion_adv(D_out_target,
                                  torch.FloatTensor(D_out_target.data.size()).fill_(source_label).to(device))
-
+        loss_adv = lambda_adv*loss_adv
         loss_adv.backward()
         optimizer.step()
         loss = loss_seg + loss_adv
@@ -147,13 +151,13 @@ for iter_i in range(max_iter):
         optimizer_D.zero_grad()
 
         pred_source = pred_source.detach()
-        D_out_source = model_D(F.softmax(pred_source, dim=0))
+        D_out_source = model_D(F.softmax(pred_source, dim=1))
 
         loss_D_source = criterion_adv(D_out_source,
                                       torch.FloatTensor(D_out_source.data.size()).fill_(source_label).to(device))
         loss_D_source.backward()
         pred_target = pred_target.detach()
-        D_out_target = model_D(F.softmax(pred_target, dim=0))
+        D_out_target = model_D(F.softmax(pred_target, dim=1))
 
         loss_D_target = criterion_adv(D_out_target,
                                       torch.FloatTensor(D_out_target.data.size()).fill_(target_label).to(device))
@@ -161,8 +165,10 @@ for iter_i in range(max_iter):
         loss_D = loss_D_source + loss_D_target
         optimizer_D.step()
 
-        G_losses.append(loss)
-        D_losses.append(loss_D)
+        seg_losses.append(loss_seg.item())
+        adv_losses.append(loss_adv.item()/lambda_adv)
+        G_losses.append(loss.item())
+        D_losses.append(loss_D.item())
         print(i, 'Lseg:', loss_seg.item(), 'Ladv:', loss_adv.item(), 'loss_d_source:', loss_D_source.item(), 'loss_d_target:', loss_D_target.item())
 
         # if i > 5:
@@ -171,7 +177,7 @@ for iter_i in range(max_iter):
 
     # ax enables access to manipulate each of subplots
     fig = plt.figure()
-    fig.suptitle('Epoch '+ iter_i)
+    fig.suptitle('Epoch '+ str(iter_i))
 
     ax = []
 
@@ -193,6 +199,21 @@ for iter_i in range(max_iter):
     ax[-1].set_title('Cityscape label')  # set title
     plt.imshow(label2color(pred_target_label.cpu()))
 
+    plt.show()
+
+    fig = plt.figure()
+    ax = []
+    ax.append(fig.add_subplot(2, 1, 1))
+    ax[-1].set_title('Segmentation Losses')  # set title
+    plt.plot(seg_losses)
+    plt.plot(adv_losses)
+    ax[-1].legend(['Seg loss','Adv loss'])
+
+    ax.append(fig.add_subplot(2, 1, 2))
+    ax[-1].set_title('Overall losses')  # set title
+    plt.plot(G_losses)
+    plt.plot(D_losses)
+    ax[-1].legend(['L','Ld'])
     plt.show()
 
 
