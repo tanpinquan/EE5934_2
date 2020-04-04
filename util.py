@@ -68,6 +68,26 @@ PALETTE = [
     [119, 11, 32],
     [0, 0, 0]]
 
+LABEL = ["road",
+         "sidewalk",
+         "building",
+         "wall",
+         "fence",
+         "pole",
+         "light",
+         "sign",
+         "vegetation",
+         "terrain",
+         "sky",
+         "person",
+         "rider",
+         "car",
+         "truck",
+         "bus",
+         "train",
+         "motocycle",
+         "bicycle"]
+
 
 def preprocess(img, size=(512, 1024), should_resize=True):
     if should_resize:
@@ -119,6 +139,7 @@ def label2color(label_ids):
             output_img[label_ids == label] = PALETTE[label]
     return output_img
 
+
 # def color2train(color_img):
 
 
@@ -138,10 +159,6 @@ if __name__ == "__main__":
     plt.imshow(image_deproc)
     plt.title('transformed back image')
     plt.show()
-
-
-
-
 
     with open('scene_parsing/cityscapes_info.json') as f:
         cityscapes_info = json.load(f)
@@ -163,7 +180,6 @@ if __name__ == "__main__":
     plt.imshow(output_img)
     plt.title('transformed back labels')
     plt.show()
-
 
     '''Test GTAV'''
     image_gta = np.array(PIL.Image.open('data/GTA_V/train_label/00003.png'))
