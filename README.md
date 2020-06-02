@@ -1,4 +1,8 @@
 # EE5934_P2
-EE5934 Project 2
+Perform Synthetic-to-real semantic segmentation.
+Method is inspired from the paper	"Learning to Adapt Structured Output Space for Semantic Segmentation"
 
-Data files not included. Please add the data folder provided by the instructor
+https://arxiv.org/abs/1802.10349
+
+![Screenshot](results.png)
+
